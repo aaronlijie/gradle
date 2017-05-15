@@ -522,11 +522,15 @@ public class DefaultTaskExecutionPlan implements TaskExecutionPlan {
                     return FINISHED;
                 }
 
+                if (!workerLease.tryLock()) {
+                    return RETRY;
+                }
+
                 if (allProjectsLocked()) {
                     return RETRY;
                 }
 
-                selected.set(selectNextTask(workerLease));
+                selected.set(selectNextTask());
 
                 if (selected.get() == null && workRemaining.get()) {
                     return RETRY;
@@ -542,7 +546,7 @@ public class DefaultTaskExecutionPlan implements TaskExecutionPlan {
         return workRemaining.get();
     }
 
-    private TaskInfo selectNextTask(final WorkerLease workerLease) {
+    private TaskInfo selectNextTask() {
         final AtomicReference<TaskInfo> selected = new AtomicReference<TaskInfo>();
         final Iterator<TaskInfo> iterator = executionQueue.iterator();
         while (iterator.hasNext()) {
@@ -553,7 +557,7 @@ public class DefaultTaskExecutionPlan implements TaskExecutionPlan {
                     public ResourceLockState.Disposition transform(ResourceLockState resourceLockState) {
                         ResourceLock projectLock = getProjectLock(taskInfo);
                         // TODO: convert output file checks to a resource lock
-                        if (!projectLock.tryLock() || !workerLease.tryLock() || !canRunWithCurrentlyExecutedTasks(taskInfo)) {
+                        if (!projectLock.tryLock() || !canRunWithCurrentlyExecutedTasks(taskInfo)) {
                             return FAILED;
                         }
 
@@ -578,15 +582,17 @@ public class DefaultTaskExecutionPlan implements TaskExecutionPlan {
     }
 
     private void execute(TaskInfo selectedTask, WorkerLease workerLease, Action<TaskInfo> taskExecution) {
-        if (selectedTask == null) {
-            return;
-        }
         try {
-            if (!selectedTask.isComplete()) {
+            if (selectedTask != null && !selectedTask.isComplete()) {
                 taskExecution.execute(selectedTask);
             }
         } finally {
-            coordinationService.withStateLock(unlock(workerLease, getProjectLock(selectedTask)));
+            List<ResourceLock> locks = new ArrayList<ResourceLock>(2);
+            locks.add(workerLease);
+            if (selectedTask != null) {
+                locks.add(getProjectLock(selectedTask));
+            }
+            coordinationService.withStateLock(unlock(locks));
         }
     }
 
