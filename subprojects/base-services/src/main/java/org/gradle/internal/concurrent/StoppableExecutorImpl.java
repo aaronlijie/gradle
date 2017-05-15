@@ -17,6 +17,7 @@
 package org.gradle.internal.concurrent;
 
 import org.gradle.internal.UncheckedException;
+import org.gradle.internal.operations.BuildOperationIdentifierRegistry;
 
 import java.util.List;
 import java.util.concurrent.AbstractExecutorService;
@@ -35,7 +36,7 @@ class StoppableExecutorImpl extends AbstractExecutorService implements Stoppable
     }
 
     public void execute(final Runnable command) {
-        executor.execute(trackedCommand(command));
+        executor.execute(trackedCommand(transferBuildOperationId(command)));
     }
 
     protected Runnable trackedCommand(final Runnable command) {
@@ -59,6 +60,36 @@ class StoppableExecutorImpl extends AbstractExecutorService implements Stoppable
                     return executorPolicy.onExecute(command);
                 } finally {
                     executing.set(null);
+                }
+            }
+        };
+    }
+
+    protected Runnable transferBuildOperationId(final Runnable command) {
+        final Object operationId = BuildOperationIdentifierRegistry.getCurrentOperationIdentifier();
+        return new Runnable() {
+            @Override
+            public void run() {
+                BuildOperationIdentifierRegistry.setCurrentOperationIdentifier(operationId);
+                try {
+                    command.run();
+                } finally {
+                    BuildOperationIdentifierRegistry.clearCurrentOperationIdentifier();
+                }
+            }
+        };
+    }
+
+    protected <V> Callable<V> transferBuildOperationId(final Callable<V> command) {
+        final Object operationId = BuildOperationIdentifierRegistry.getCurrentOperationIdentifier();
+        return new Callable<V>() {
+            @Override
+            public V call() throws Exception {
+                BuildOperationIdentifierRegistry.setCurrentOperationIdentifier(operationId);
+                try {
+                    return command.call();
+                } finally {
+                    BuildOperationIdentifierRegistry.clearCurrentOperationIdentifier();
                 }
             }
         };

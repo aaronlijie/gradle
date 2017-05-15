@@ -16,6 +16,8 @@
 
 package org.gradle.test.fixtures.concurrent
 
+import org.gradle.internal.operations.BuildOperationIdentifierRegistry
+
 import java.util.concurrent.Executor
 import java.util.concurrent.locks.Condition
 import java.util.concurrent.locks.Lock
@@ -47,7 +49,7 @@ class TestExecutor implements Executor {
     }
 
     void execute(Runnable runnable) {
-        def thread = new Thread() {
+        def thread = new Thread(transferBuildOperationId(new Runnable() {
             @Override
             void run() {
                 try {
@@ -74,7 +76,7 @@ class TestExecutor implements Executor {
                     }
                 }
             }
-        }
+        }))
 
         lock.lock()
         try {
@@ -85,6 +87,21 @@ class TestExecutor implements Executor {
         }
 
         thread.start()
+    }
+
+    protected Runnable transferBuildOperationId(final Runnable command) {
+        final Object operationId = BuildOperationIdentifierRegistry.getCurrentOperationIdentifier();
+        return new Runnable() {
+            @Override
+            public void run() {
+                BuildOperationIdentifierRegistry.setCurrentOperationIdentifier(operationId);
+                try {
+                    command.run();
+                } finally {
+                    BuildOperationIdentifierRegistry.clearCurrentOperationIdentifier();
+                }
+            }
+        };
     }
 
     void stop(Date expiry) {

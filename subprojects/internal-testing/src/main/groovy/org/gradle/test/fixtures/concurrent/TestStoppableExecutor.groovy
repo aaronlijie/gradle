@@ -17,6 +17,7 @@
 package org.gradle.test.fixtures.concurrent
 
 import org.gradle.internal.concurrent.StoppableExecutor
+import org.gradle.internal.operations.BuildOperationIdentifierRegistry
 
 import java.util.concurrent.AbstractExecutorService
 import java.util.concurrent.TimeUnit
@@ -42,7 +43,7 @@ class TestStoppableExecutor extends AbstractExecutorService implements Stoppable
             lock.unlock()
         }
 
-        executor.execute {
+        executor.execute transferBuildOperationId({
             try {
                 command.run()
             } finally {
@@ -52,6 +53,21 @@ class TestStoppableExecutor extends AbstractExecutorService implements Stoppable
                     condition.signalAll()
                 } finally {
                     lock.unlock()
+                }
+            }
+        })
+    }
+
+    private Runnable transferBuildOperationId(final Runnable runnable) {
+        final Object operationId = BuildOperationIdentifierRegistry.currentOperationIdentifier;
+        return new Runnable() {
+            @Override
+            void run() {
+                BuildOperationIdentifierRegistry.currentOperationIdentifier = operationId;
+                try {
+                    runnable.run();
+                } finally {
+                    BuildOperationIdentifierRegistry.clearCurrentOperationIdentifier();
                 }
             }
         }

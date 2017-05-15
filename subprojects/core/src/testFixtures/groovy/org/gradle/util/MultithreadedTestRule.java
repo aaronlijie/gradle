@@ -22,6 +22,7 @@ import org.codehaus.groovy.runtime.InvokerInvocationException;
 import org.gradle.internal.UncheckedException;
 import org.gradle.internal.concurrent.DefaultExecutorFactory;
 import org.gradle.internal.concurrent.ExecutorFactory;
+import org.gradle.internal.operations.BuildOperationIdentifierRegistry;
 import org.hamcrest.Matcher;
 import org.junit.After;
 import org.junit.rules.ExternalResource;
@@ -442,7 +443,22 @@ public class MultithreadedTestRule extends ExternalResource {
         private final Set<ThreadHandle> threads = new CopyOnWriteArraySet<ThreadHandle>();
 
         public void execute(Runnable command) {
-            threads.add(start(command));
+            threads.add(start(transferBuildOperationId(command)));
+        }
+
+        private Runnable transferBuildOperationId(final Runnable command) {
+            final Object operationId = BuildOperationIdentifierRegistry.getCurrentOperationIdentifier();
+            return new Runnable() {
+                @Override
+                public void run() {
+                    BuildOperationIdentifierRegistry.setCurrentOperationIdentifier(operationId);
+                    try {
+                        command.run();
+                    } finally {
+                        BuildOperationIdentifierRegistry.clearCurrentOperationIdentifier();
+                    }
+                }
+            };
         }
 
         public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {

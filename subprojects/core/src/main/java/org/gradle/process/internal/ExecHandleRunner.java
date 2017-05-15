@@ -20,6 +20,7 @@ import net.rubygrapefruit.platform.ProcessLauncher;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
 import org.gradle.internal.concurrent.ExecutorFactory;
+import org.gradle.internal.operations.BuildOperationIdentifierRegistry;
 import org.gradle.process.internal.streams.StreamsHandler;
 
 import java.util.concurrent.locks.Lock;
@@ -32,6 +33,7 @@ public class ExecHandleRunner implements Runnable {
     private final DefaultExecHandle execHandle;
     private final Lock lock = new ReentrantLock();
     private final ProcessLauncher processLauncher;
+//    private final Object operationId;
     private final ExecutorFactory executorFactory;
 
     private Process process;
@@ -39,12 +41,17 @@ public class ExecHandleRunner implements Runnable {
     private final StreamsHandler streamsHandler;
 
     public ExecHandleRunner(DefaultExecHandle execHandle, StreamsHandler streamsHandler, ProcessLauncher processLauncher, ExecutorFactory executorFactory) {
+//        this(execHandle, streamsHandler, processLauncher, executorFactory, BuildOperationIdentifierRegistry.getCurrentOperationIdentifier());
+//    }
+//
+//    public ExecHandleRunner(DefaultExecHandle execHandle, StreamsHandler streamsHandler, ProcessLauncher processLauncher, ExecutorFactory executorFactory, Object operationId) {
         this.processLauncher = processLauncher;
         this.executorFactory = executorFactory;
         if (execHandle == null) {
             throw new IllegalArgumentException("execHandle == null!");
         }
         this.streamsHandler = streamsHandler;
+//        this.operationId = operationId;
         this.processBuilderFactory = new ProcessBuilderFactory();
         this.execHandle = execHandle;
     }
@@ -64,6 +71,7 @@ public class ExecHandleRunner implements Runnable {
 
     public void run() {
         try {
+//            BuildOperationIdentifierRegistry.setCurrentOperationIdentifier(operationId);
             ProcessBuilder processBuilder = processBuilderFactory.createProcessBuilder(execHandle);
             Process process = processLauncher.start(processBuilder);
             streamsHandler.connectStreams(process, execHandle.getDisplayName(), executorFactory);
@@ -84,6 +92,8 @@ public class ExecHandleRunner implements Runnable {
             }
         } catch (Throwable t) {
             execHandle.failed(t);
+//        } finally {
+//            BuildOperationIdentifierRegistry.clearCurrentOperationIdentifier();
         }
     }
 

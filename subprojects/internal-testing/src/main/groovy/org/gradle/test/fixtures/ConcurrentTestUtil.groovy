@@ -18,6 +18,7 @@ package org.gradle.test.fixtures
 import org.gradle.internal.concurrent.ExecutorFactory
 import org.gradle.internal.concurrent.StoppableExecutor
 import org.gradle.internal.concurrent.StoppableScheduledExecutor
+import org.gradle.internal.operations.BuildOperationIdentifierRegistry
 import org.junit.rules.ExternalResource
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -471,7 +472,22 @@ class StoppableExecutorStub extends AbstractExecutorService implements Stoppable
     }
 
     void execute(Runnable runnable) {
-        threads.add(owner.startThread(runnable))
+        threads.add(owner.startThread(transferBuildOperationId(runnable)))
+    }
+
+    private Runnable transferBuildOperationId(final Runnable runnable) {
+        final Object operationId = BuildOperationIdentifierRegistry.currentOperationIdentifier;
+        return new Runnable() {
+            @Override
+            void run() {
+                BuildOperationIdentifierRegistry.currentOperationIdentifier = operationId;
+                try {
+                    runnable.run();
+                } finally {
+                    BuildOperationIdentifierRegistry.clearCurrentOperationIdentifier();
+                }
+            }
+        }
     }
 
     void shutdown() {

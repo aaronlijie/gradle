@@ -19,6 +19,7 @@ package org.gradle.process.internal.streams;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
 import org.gradle.internal.concurrent.CompositeStoppable;
+import org.gradle.internal.operations.BuildOperationIdentifierRegistry;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,22 +32,29 @@ public class ExecOutputHandleRunner implements Runnable {
     private final String displayName;
     private final InputStream inputStream;
     private final OutputStream outputStream;
+//    private final Object operationId;
     private final int bufferSize;
 
-    public ExecOutputHandleRunner(String displayName, InputStream inputStream, OutputStream outputStream) {
-        this(displayName, inputStream, outputStream, 2048);
+//    public ExecOutputHandleRunner(String displayName, InputStream inputStream, OutputStream outputStream) {
+//        this(displayName, inputStream, outputStream, BuildOperationIdentifierRegistry.getCurrentOperationIdentifier(), 2048);
+//    }
+
+    public ExecOutputHandleRunner(String displayName, InputStream inputStream, OutputStream outputStream/*, Object operationId*/) {
+        this(displayName, inputStream, outputStream, /*operationId,*/ 2048);
     }
 
-    ExecOutputHandleRunner(String displayName, InputStream inputStream, OutputStream outputStream, int bufferSize) {
+    ExecOutputHandleRunner(String displayName, InputStream inputStream, OutputStream outputStream, /*Object operationId,*/ int bufferSize) {
         this.displayName = displayName;
         this.inputStream = inputStream;
         this.outputStream = outputStream;
+//        this.operationId = operationId;
         this.bufferSize = bufferSize;
     }
 
     public void run() {
         byte[] buffer = new byte[bufferSize];
         try {
+//            BuildOperationIdentifierRegistry.setCurrentOperationIdentifier(operationId);
             while (true) {
                 int nread = inputStream.read(buffer);
                 if (nread < 0) {
@@ -58,6 +66,8 @@ public class ExecOutputHandleRunner implements Runnable {
             CompositeStoppable.stoppable(inputStream, outputStream).stop();
         } catch (Throwable t) {
             LOGGER.error(String.format("Could not %s.", displayName), t);
+//        } finally {
+//            BuildOperationIdentifierRegistry.clearCurrentOperationIdentifier();
         }
     }
 

@@ -31,21 +31,21 @@ public class StoppableScheduledExecutorImpl extends StoppableExecutorImpl implem
 
     @Override
     public ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit) {
-        return executor.schedule(trackedCommand(command), delay, unit);
+        return executor.schedule(trackedCommand(transferBuildOperationId(command)), delay, unit);
     }
 
     @Override
     public <V> ScheduledFuture<V> schedule(Callable<V> callable, long delay, TimeUnit unit) {
-        return executor.schedule(trackedCommand(callable), delay, unit);
+        return executor.schedule(trackedCommand(transferBuildOperationId(callable)), delay, unit);
     }
 
     @Override
     public ScheduledFuture<?> scheduleAtFixedRate(Runnable command, long initialDelay, long period, TimeUnit unit) {
-        return executor.scheduleAtFixedRate(trackedCommand(command), initialDelay, period, unit);
+        return executor.scheduleAtFixedRate(trackedCommand(transferBuildOperationId(command)), initialDelay, period, unit);
     }
 
     @Override
     public ScheduledFuture<?> scheduleWithFixedDelay(Runnable command, long initialDelay, long delay, TimeUnit unit) {
-        return executor.scheduleWithFixedDelay(trackedCommand(command), initialDelay, delay, unit);
+        return executor.scheduleWithFixedDelay(trackedCommand(transferBuildOperationId(command)), initialDelay, delay, unit);
     }
 }
