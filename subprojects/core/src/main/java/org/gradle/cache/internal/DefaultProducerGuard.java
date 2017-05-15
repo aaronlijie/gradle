@@ -15,14 +15,13 @@
  */
 package org.gradle.cache.internal;
 
-import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.Striped;
 import org.gradle.internal.Factory;
-import org.gradle.internal.UncheckedException;
 
-import java.util.Set;
+import java.util.concurrent.locks.Lock;
 
 public class DefaultProducerGuard<T> implements ProducerGuard<T> {
-    private final Set<T> producing = Sets.newHashSet();
+    private final Striped<Lock> locks = Striped.lock(8);
 
     /**
      * Synchronizes access to some resource, by making sure that 2 threads do not try to produce it at the same time.
@@ -38,22 +37,12 @@ public class DefaultProducerGuard<T> implements ProducerGuard<T> {
      */
     @Override
     public <V> V guardByKey(T key, Factory<V> factory) {
-        synchronized (producing) {
-            while (!producing.add(key)) {
-                try {
-                    producing.wait();
-                } catch (InterruptedException e) {
-                    throw UncheckedException.throwAsUncheckedException(e);
-                }
-            }
-        }
+        Lock lock = locks.get(key);
         try {
+            lock.lock();
             return factory.create();
         } finally {
-            synchronized (producing) {
-                producing.remove(key);
-                producing.notifyAll();
-            }
+            lock.unlock();
         }
     }
 }
