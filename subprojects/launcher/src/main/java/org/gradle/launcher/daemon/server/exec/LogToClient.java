@@ -30,6 +30,9 @@ import org.gradle.launcher.daemon.protocol.Build;
 import org.gradle.launcher.daemon.server.api.DaemonCommandExecution;
 import org.gradle.launcher.daemon.server.api.DaemonConnection;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -102,16 +105,18 @@ public class LogToClient extends BuildCommandOnly {
 
         @Override
         public void run() {
-            OutputEvent event;
             try {
                 while (!shouldStop) {
+                    List<OutputEvent> events = new ArrayList<OutputEvent>();
                     // we must not use interrupt() because it would automatically
                     // close the connection (sending data from an interrupted thread
                     // automatically closes the connection)
-                    event = eventQueue.poll(10, TimeUnit.MILLISECONDS);
+                    OutputEvent event = eventQueue.poll(10, TimeUnit.MILLISECONDS);
                     if (event != null) {
-                        dispatchAsync(event);
+                        events.add(event);
+                        eventQueue.drainTo(events, 100);
                     }
+                    dispatchAsync(events);
                 }
             } catch (InterruptedException ex) {
                 shouldStop = true;
@@ -121,18 +126,15 @@ public class LogToClient extends BuildCommandOnly {
         }
 
         private void sendRemainingEvents() {
-            OutputEvent event;
-            while ((event = eventQueue.poll()) != null) {
-                dispatchAsync(event);
-            }
+            dispatchAsync(eventQueue);
         }
 
-        private void dispatchAsync(OutputEvent event) {
+        private void dispatchAsync(Collection<OutputEvent> events) {
             if (unableToSend) {
                 return;
             }
             try {
-                connection.logEvent(event);
+                connection.logEvents(events);
             } catch (Exception ex) {
                 shouldStop = true;
                 unableToSend = true;

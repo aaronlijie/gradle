@@ -29,6 +29,7 @@ import org.gradle.internal.remote.internal.RemoteConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collection;
 import java.util.LinkedList;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -122,6 +123,16 @@ public class DefaultDaemonConnection implements DaemonConnection {
 
     public void logEvent(OutputEvent logEvent) {
         connection.dispatch(new OutputMessage(logEvent));
+        connection.flush();
+    }
+
+    public void logEvents(Collection<OutputEvent> logEvents) {
+        if (logEvents.isEmpty()) {
+            return;
+        }
+        for (OutputEvent logEvent : logEvents) {
+            connection.dispatch(new OutputMessage(logEvent));
+        }
         connection.flush();
     }
 
